@@ -1,0 +1,14 @@
+transformers
+torch
+numpy
+einops
+huggingface_hub
+mlx-vlm
+pillow
+torchvision
+nnsight
+hqq
+accelerate
+scikit-learn
+matplotlib
+tqdm
