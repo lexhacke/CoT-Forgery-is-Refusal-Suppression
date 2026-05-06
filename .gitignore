@@ -5,4 +5,4 @@ __pycache__
 refusal_direction
 *.pt
 *.pdf
-experiment1/artifacts
+src/artifacts

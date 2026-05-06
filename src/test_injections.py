@@ -6,8 +6,8 @@ concatenated into the user turn). This is the *current* PoC format; the
 question is whether anything bites at all with thinking suppressed.
 
 Usage:
-  python3 experiment1/test_injections.py
-  python3 experiment1/test_injections.py --model-id MODEL --max-new-tokens 160
+  python3 src/test_injections.py
+  python3 src/test_injections.py --model-id MODEL --max-new-tokens 160
 
 Requires:
   none; this is independent injection triage

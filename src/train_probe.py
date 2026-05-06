@@ -5,11 +5,11 @@ pick the best layer, save all probes + accuracies.
 Deprecated: the geometric dot/cosine readouts are preferred for the paper.
 
 Usage:
-  python3 experiment1/train_probe.py --model-id MODEL
-  python3 experiment1/train_probe.py --model-id MODEL --n-val 32
+  python3 src/train_probe.py --model-id MODEL
+  python3 src/train_probe.py --model-id MODEL --n-val 32
 
 Requires:
-  python3 experiment1/compute_refusal_direction.py --model-id MODEL
+  python3 src/compute_refusal_direction.py --model-id MODEL
 """
 
 from __future__ import annotations

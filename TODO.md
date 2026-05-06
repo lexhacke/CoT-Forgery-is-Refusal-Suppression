@@ -9,14 +9,14 @@ Run the calibrated-projection causal-closure experiment across four models and d
 - **3A restoration:** for injected prompts that bite, project `r_hat` back so `p(h) = p_clean`. Success means refusal returns.
 - **3B matched ablation:** for benign-filler prompts that refuse, project `r_hat` down so `p(h) = p_injected`. Success means compliance appears.
 
-`experiment1/calibrated_projection.py` implements both interventions.
+`src/calibrated_projection.py` implements both interventions.
 
 ## Artifact Layout
 
 All scripts now use one canonical artifact layout:
 
 ```text
-experiment1/artifacts/<model>/
+src/artifacts/<model>/
 ├── refusal.pt
 ├── cosine_results.json
 ├── dot_results.json
@@ -24,7 +24,7 @@ experiment1/artifacts/<model>/
 └── plots/
 ```
 
-The model folder names are registered in `experiment1/experiment_paths.py`.
+The model folder names are registered in `src/experiment_paths.py`.
 
 Current aliases:
 
@@ -37,46 +37,46 @@ Current aliases:
 | `Qwen/Qwen3.5-2B` | `qwen3.5-2b` |
 | `google/gemma-4-E2B-it` | `gemma-4-e2b-it` |
 
-No script writes default-model artifacts directly into `experiment1/artifacts/` anymore.
+No script writes default-model artifacts directly into `src/artifacts/` anymore.
 
 ## Run Order
 
 For each model, compute the refusal direction first:
 
 ```bash
-.venv/bin/python -u experiment1/compute_refusal_direction.py --model-id <MODEL_ID>
+.venv/bin/python -u src/compute_refusal_direction.py --model-id <MODEL_ID>
 ```
 
 This writes:
 
 ```text
-experiment1/artifacts/<model>/refusal.pt
+src/artifacts/<model>/refusal.pt
 ```
 
 Then run whichever downstream experiment you need:
 
 ```bash
 # Layer sweep, normalized cosine
-.venv/bin/python -u experiment1/cosine_sweep.py --model-id <MODEL_ID> --metric cosine
+.venv/bin/python -u src/cosine_sweep.py --model-id <MODEL_ID> --metric cosine
 
 # Layer sweep, intervention-aligned dot product
-.venv/bin/python -u experiment1/cosine_sweep.py --model-id <MODEL_ID> --metric dot
+.venv/bin/python -u src/cosine_sweep.py --model-id <MODEL_ID> --metric dot
 
 # Per-token trajectory at a chosen layer
-.venv/bin/python -u experiment1/token_trajectory.py --model-id <MODEL_ID> --layer 13 --metric cosine
-.venv/bin/python -u experiment1/token_trajectory.py --model-id <MODEL_ID> --layer 13 --metric dot
+.venv/bin/python -u src/token_trajectory.py --model-id <MODEL_ID> --layer 13 --metric cosine
+.venv/bin/python -u src/token_trajectory.py --model-id <MODEL_ID> --layer 13 --metric dot
 
 # Full refusal-direction ablation
-.venv/bin/python -u experiment1/ablate_refusal.py --model-id <MODEL_ID> --direction-layer 14
+.venv/bin/python -u src/ablate_refusal.py --model-id <MODEL_ID> --direction-layer 14
 
 # Causal closure
-.venv/bin/python -u experiment1/calibrated_projection.py --model-id <MODEL_ID> --layer 13
+.venv/bin/python -u src/calibrated_projection.py --model-id <MODEL_ID> --layer 13
 ```
 
 Phi usually needs a longer generation window:
 
 ```bash
-.venv/bin/python -u experiment1/calibrated_projection.py \
+.venv/bin/python -u src/calibrated_projection.py \
   --model-id microsoft/Phi-4-mini-reasoning \
   --layer 13 \
   --max-new-tokens 1024
@@ -91,7 +91,7 @@ Phi usually needs a longer generation window:
 | 3 | `microsoft/Phi-4-mini-reasoning` | Evaluate real answer after `</think>` |
 | 4 | `google/gemma-3-4b-it` | Multimodal architecture; text paths registered in wrapper |
 
-Forgery set: `experiment1/forgeries.json`.
+Forgery set: `src/forgeries.json`.
 
 Prompt format: `harmful_prompt + " " + forged_cot` inside the user turn.
 
@@ -100,7 +100,7 @@ Prompt format: `harmful_prompt + " " + forged_cot` inside the user turn.
 For each model, read:
 
 ```text
-experiment1/artifacts/<model>/calibrated_projection_L13.json
+src/artifacts/<model>/calibrated_projection_L13.json
 ```
 
 Relevant fields:

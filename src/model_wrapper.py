@@ -23,12 +23,14 @@ Usage:
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import snapshot_download
+from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerFast
 
 # Load HF_TOKEN from .env (project root). Skipping python-dotenv to keep deps minimal.
 def _load_env_file(path: Path) -> None:
@@ -48,6 +50,11 @@ _load_env_file(Path(__file__).resolve().parent.parent / ".env")
 DEFAULT_MODEL_ID = "google/gemma-2-2b-it"
 
 
+DEEPSEEK_R1_DISTILL_QWEN_IDS = {
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+}
+
+
 def _get_nested_attr(obj, path: list[str]):
     for step in path:
         obj = getattr(obj, step)
@@ -62,6 +69,37 @@ def _hidden_from_output(out):
     if hasattr(out, "hidden_states") and out.hidden_states is not None:
         return out.hidden_states[-1]
     return out
+
+
+def _load_tokenizer(model_id: str, token: Optional[str]):
+    """Load tokenizer, fixing DeepSeek R1 Distill Qwen's tokenizer-class mismatch.
+
+    That repo declares a Qwen2 model but a LlamaTokenizerFast tokenizer class.
+    AutoTokenizer then decodes Qwen byte-level tokens literally (e.g. Ġ/Ċ).
+    Loading tokenizer.json through the generic fast backend preserves decoding.
+    """
+    if model_id in DEEPSEEK_R1_DISTILL_QWEN_IDS:
+        snapshot = snapshot_download(
+            model_id,
+            token=token,
+            allow_patterns=["tokenizer.json", "tokenizer_config.json"],
+        )
+        config_path = Path(snapshot) / "tokenizer_config.json"
+        tokenizer_path = Path(snapshot) / "tokenizer.json"
+        config = json.loads(config_path.read_text())
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_file=str(tokenizer_path),
+            bos_token=config["bos_token"]["content"],
+            eos_token=config["eos_token"]["content"],
+            pad_token=config["pad_token"]["content"],
+            clean_up_tokenization_spaces=config.get(
+                "clean_up_tokenization_spaces", False
+            ),
+        )
+        tokenizer.chat_template = config.get("chat_template")
+        return tokenizer
+
+    return AutoTokenizer.from_pretrained(model_id, token=token)
 
 
 @dataclass
@@ -95,11 +133,6 @@ class GemmaActivationModel:
         self.device = device
         self.dtype = dtype
         self.known_models = {
-            "google/gemma-4-E2B": {
-                "layer_path": ["model", 'language_model', 'layers'],
-                "embed_path": ["model", "language_model", "embed_tokens"],
-                "config_path": ["config", "text_config", "hidden_size"],
-            },
             "google/gemma-4-E2B-it": {
                 "layer_path": ["model", "language_model", "layers"],
                 "embed_path": ["model", "language_model", "embed_tokens"],
@@ -124,6 +157,11 @@ class GemmaActivationModel:
                 "layer_path": ["model", "language_model", "layers"],
                 "embed_path": ["model", "language_model", "embed_tokens"],
                 "config_path": ["config", "text_config", "hidden_size"],
+            },
+            "google/gemma-2-9b-it": {
+                "layer_path": ["model", "layers"],
+                "embed_path": ["model", "embed_tokens"],
+                "config_path": ["config", "hidden_size"],
             },
             "google/gemma-2-2b-it": {
                 "layer_path": ["model", "layers"],
@@ -165,9 +203,14 @@ class GemmaActivationModel:
                 "embed_path": ["model", "embed_tokens"],
                 "config_path": ["config", "hidden_size"],
             },
-            "nvidia/NVIDIA-Nemotron-3-Nano-4B-FP8": {
+            "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1": {
                 "layer_path": ["model", 'layers'],
-                "embed_path": ["model", "embeddings"],
+                "embed_path": ["model", "embed_tokens"],
+                "config_path": ["config", "hidden_size"],
+            },
+            "nvidia/Llama-3.1-Nemotron-Nano-8B-v1": {
+                "layer_path": ["model", 'layers'],
+                "embed_path": ["model", "embed_tokens"],
                 "config_path": ["config", "hidden_size"],
             },
             "meta-llama/Llama-3.2-3B-Instruct": {
@@ -175,11 +218,22 @@ class GemmaActivationModel:
                 "embed_path": ["model", "embed_tokens"],
                 "config_path": ["config", "hidden_size"],
             },
-
+            "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B":
+            {
+                "layer_path": ["model", 'layers'],
+                "embed_path": ["model", "embed_tokens"],
+                "config_path": ["config", "hidden_size"],
+            },
+            "allenai/OLMo-2-0425-1B-Instruct":
+            {
+                "layer_path": ["model", 'layers'],
+                "embed_path": ["model", "embed_tokens"],
+                "config_path": ["config", "hidden_size"],
+            },
         }
 
         token = os.environ.get("HF_TOKEN")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
+        self.tokenizer = _load_tokenizer(model_id, token=token)
         self.tokenizer.padding_side = "left"
 
         # eager attention plays nicest with forward hooks on MPS;
@@ -216,7 +270,7 @@ class GemmaActivationModel:
             print(e)
             raise SystemExit(1)
 
-    def format_prompt(self, instruction: str, enable_thinking: Optional[bool] = False, suffix: Optional[str] = None) -> str:
+    def format_prompt(self, instruction: str, enable_thinking: Optional[bool] = False, system: Optional[str]=None, suffix: Optional[str] = None) -> str:
         """Apply Gemma-2 chat template with `add_generation_prompt=True`.
 
         If `suffix` is given, append after the model-turn opener so the model
@@ -224,7 +278,11 @@ class GemmaActivationModel:
         For Ye et al.-style attacks where the forgery lives in the user turn,
         pass it as part of `instruction` instead.
         """
-        messages = [{"role": "user", "content": instruction}]
+        messages = []
+        if system is not None:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": instruction})
+                            
         if self.tokenizer.chat_template is not None:
             formatted = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True, enable_thinking=enable_thinking

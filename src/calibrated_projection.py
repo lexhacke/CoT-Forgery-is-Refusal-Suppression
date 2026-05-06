@@ -21,13 +21,13 @@ Indexing convention:
   If --layer is omitted, edit every transformer block output layer.
 
 Usage:
-  python3 experiment1/calibrated_projection.py --model-id MODEL
-  python3 experiment1/calibrated_projection.py --model-id MODEL --layer 13
-  python3 experiment1/calibrated_projection.py --model-id MODEL --intervention shift --token-scope all
-  python3 experiment1/calibrated_projection.py --model-id MODEL --layer 13 --max-new-tokens 1024
+  python3 src/calibrated_projection.py --model-id MODEL
+  python3 src/calibrated_projection.py --model-id MODEL --layer 13
+  python3 src/calibrated_projection.py --model-id MODEL --intervention shift --token-scope all
+  python3 src/calibrated_projection.py --model-id MODEL --layer 13 --max-new-tokens 1024
 
 Requires:
-  python3 experiment1/compute_refusal_direction.py --model-id MODEL
+  python3 src/compute_refusal_direction.py --model-id MODEL
 """
 
 from __future__ import annotations
@@ -63,6 +63,7 @@ def make_projection_match_hook(
     *,
     intervention: str,
     token_scope: str,
+    normalise: bool,
     generated_tokens_too: bool = False,
 ):
     """Edit a stack layer along r_hat.
@@ -127,9 +128,14 @@ def make_projection_match_hook(
                 raise ValueError(f"Unknown intervention: {intervention}")
         else:
             raise ValueError(f"Unknown token scope: {token_scope}")
-        new_magnitude = edited.norm(dim=-1)
-        edited = original_magnitude.unsqueeze(-1) * edited / new_magnitude.unsqueeze(-1)
-        #print(f"Magnitude grew by {(new_magnitude / original_magnitude).max():.2}x")
+        if normalise:
+            new_magnitude = edited.norm(dim=-1)
+            edited = (
+                original_magnitude.unsqueeze(-1)
+                * edited
+                / (new_magnitude.unsqueeze(-1) + 1e-8)
+            )
+            # print(f"Magnitude grew by {(new_magnitude / original_magnitude).max():.2}x")
         if isinstance(output, tuple):
             return (edited,) + output[1:]
         return edited
@@ -147,6 +153,7 @@ def generate_with_projection_match(
     *,
     intervention: str,
     token_scope: str,
+    normalise: bool,
     max_new_tokens: int,
     generated_tokens_too: bool,
 ) -> str:
@@ -159,6 +166,7 @@ def generate_with_projection_match(
             target_projections[layer],
             intervention=intervention,
             token_scope=token_scope,
+            normalise=normalise,
             generated_tokens_too=generated_tokens_too,
         )
         for layer in layers
@@ -218,6 +226,17 @@ def main():
         action="store_true",
         help="Clamp generated token projections too; default edits prefill final token only.",
     )
+    ap.add_argument(
+        "--normalise",
+        "--normalize",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Preserve each edited activation vector's original norm after the "
+            "intervention. Use --no-normalise to leave intervention-induced "
+            "norm changes intact."
+        ),
+    )
     args = ap.parse_args()
 
     artifact_dir = artifact_dir_for(args.model_id)
@@ -242,6 +261,7 @@ def main():
     print(f"Raw |r| preview: {norm_preview}")
     print(f"Intervention: {args.intervention}")
     print(f"Token scope: {args.token_scope}")
+    print(f"Normalise edited activations: {args.normalise}")
     print(f"Editing generated tokens too: {args.generated_tokens_too}")
 
     forgeries = json.loads((EXPERIMENT_DIR / "forgeries.json").read_text())
@@ -299,6 +319,7 @@ def main():
             p_clean,
             intervention=args.intervention,
             token_scope=args.token_scope,
+            normalise=args.normalise,
             max_new_tokens=args.max_new_tokens,
             generated_tokens_too=args.generated_tokens_too,
         )
@@ -311,6 +332,7 @@ def main():
             p_benign,
             intervention=args.intervention,
             token_scope=args.token_scope,
+            normalise=args.normalise,
             max_new_tokens=args.max_new_tokens,
             generated_tokens_too=args.generated_tokens_too,
         )
@@ -323,6 +345,7 @@ def main():
             p_injected,
             intervention=args.intervention,
             token_scope=args.token_scope,
+            normalise=args.normalise,
             max_new_tokens=args.max_new_tokens,
             generated_tokens_too=args.generated_tokens_too,
         )
@@ -335,6 +358,7 @@ def main():
             p_injected,
             intervention=args.intervention,
             token_scope=args.token_scope,
+            normalise=args.normalise,
             max_new_tokens=args.max_new_tokens,
             generated_tokens_too=args.generated_tokens_too,
         )
@@ -361,6 +385,8 @@ def main():
             print(f"  [{label:20s}] {preview}")
 
     suffix = f"_{args.intervention}_{args.token_scope}"
+    if not args.normalise:
+        suffix += "_unnormalised"
     if args.generated_tokens_too:
         suffix += "_allsteps"
     out_dir = artifact_dir / "calibrated_projection" / f"{layer_label}{suffix}"

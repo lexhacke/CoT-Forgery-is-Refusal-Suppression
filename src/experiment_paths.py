@@ -8,19 +8,30 @@ EXPERIMENT_DIR = Path(__file__).parent
 DEFAULT_ARTIFACT_DIR = EXPERIMENT_DIR / "artifacts"
 
 MODEL_ARTIFACT_DIRS = {
-    "Qwen/Qwen2.5-3B-Instruct": "qwen2.5-3b-instruct",
-    "microsoft/Phi-3-mini-4k-instruct": "phi-3-mini-instruct",
-    "microsoft/Phi-2": "phi-2",
-    "meta-llama/Llama-2-7b-chat-hf": "Llama-2-7b-chat-hf",
-    "google/gemma-2-2b-it": "gemma-2-2b-it",
+    #"Qwen/Qwen3.5-2B": "qwen3.5-2b",
     "Qwen/Qwen2.5-1.5B-Instruct": "qwen2.5-1.5b-instruct",
+    "Qwen/Qwen2.5-3B-Instruct": "qwen2.5-3b-instruct",
+
     "microsoft/Phi-4-mini-reasoning": "phi-4-mini-reasoning",
-    "google/gemma-3-4b-it": "gemma-3-4b-it",
+    #"microsoft/Phi-3-mini-4k-instruct": "phi-3-mini-instruct",
+
+    #"google/gemma-4-E2B-it": "gemma-4-e2b-it",
     "google/gemma-3-1b-it": "gemma-3-1b-it",
-    "Qwen/Qwen3.5-2B": "qwen3.5-2b",
-    "google/gemma-4-E2B-it": "gemma-4-e2b-it",
+    "google/gemma-3-4b-it": "gemma-3-4b-it",
+    "google/gemma-3-12b-it": "gemma-3-12b-it",
+    "google/gemma-2-2b-it": "gemma-2-2b-it",
+    "google/gemma-2-9b-it": "gemma-2-9b-it",
+    
+    "nvidia/Llama-3.1-Nemotron-Nano-8B-v1": "Llama-Nemotron-8B",
+    "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1": "Llama-Nemotron-4B",
+    "meta-llama/Llama-3.1-8B-Instruct": "Llama-3.1-8B-Instruct",
     "meta-llama/Llama-3.2-3B-Instruct": "Llama-3.2-3B-Instruct",
-    "nvidia/NVIDIA-Nemotron-3-Nano-4B-FP8": "Nemotron-3-Nano-4B",
+    "meta-llama/Llama-3.2-1B-Instruct": "Llama-3.2-1B-Instruct",
+    "meta-llama/Llama-2-7b-chat-hf": "Llama-2-7b-chat-hf",
+
+    #"deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": "Deepseek-R1-1.5B",
+
+    #"allenai/OLMo-2-0425-1B-Instruct": "olmo-2-1b"
 }
 
 

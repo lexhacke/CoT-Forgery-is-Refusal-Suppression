@@ -17,11 +17,11 @@ Hooks ablate `r` everywhere it could be written into the residual stream:
 This matches Arditi's get_all_direction_ablation_hooks pattern.
 
 Usage:
-  python3 experiment1/ablate_refusal.py --model-id MODEL --direction-layer 14
-  python3 experiment1/ablate_refusal.py --model-id MODEL --direction-layer 14 --max-new-tokens 256
+  python3 src/ablate_refusal.py --model-id MODEL --direction-layer 14
+  python3 src/ablate_refusal.py --model-id MODEL --direction-layer 14 --max-new-tokens 256
 
 Requires:
-  python3 experiment1/compute_refusal_direction.py --model-id MODEL
+  python3 src/compute_refusal_direction.py --model-id MODEL
 """
 
 from __future__ import annotations

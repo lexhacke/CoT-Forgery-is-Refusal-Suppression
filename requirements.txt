@@ -12,3 +12,7 @@ accelerate
 scikit-learn
 matplotlib
 tqdm
+google-genai
+python-dotenv
+flash-linear-attention
+causal-conv1d

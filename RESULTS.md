@@ -1,6 +1,6 @@
 # RESULTS.md — Experiment 1 PoC
 
-Pilot results from `experiment1/`. Five experiments, ~3 minutes of compute total. Goal was a go/no-go signal on whether "prompt injection suppresses the refusal direction" survives first contact with data.
+Pilot results from `src/`. Five experiments, ~3 minutes of compute total. Goal was a go/no-go signal on whether "prompt injection suppresses the refusal direction" survives first contact with data.
 
 **Headline:** signal is real, but only after correcting an overfit probe. Geometric (cosine-similarity) measurement shows injection suppresses the refusal direction by ~3× more than a length-matched benign control, peaking at layer 13 — exactly where Arditi found `r` is most causally active. Suppression is partial (~27% of the harmful→harmless class gap), which is consistent with injection's partial behavioral effect.
 
@@ -11,9 +11,9 @@ Pilot results from `experiment1/`. Five experiments, ~3 minutes of compute total
 ## Setup
 
 - **Model:** `google/gemma-2-2b-it`, bf16, MPS (Apple Silicon, no quantization)
-- **Wrapper:** plain `transformers` + manual forward hooks (`experiment1/model_wrapper.py`)
+- **Wrapper:** plain `transformers` + manual forward hooks (`src/model_wrapper.py`)
 - **Dataset:** Arditi et al.'s harmful/harmless splits, 128 train + 32 val per class
-- **Forgeries:** 5 hand-written `(harmful_prompt, forged_cot, length-matched_benign_filler)` tuples in `experiment1/forgeries.json`
+- **Forgeries:** 5 hand-written `(harmful_prompt, forged_cot, length-matched_benign_filler)` tuples in `src/forgeries.json`
 - **Throughput:** ~10 it/s on MPS for forward-pass with hooks; full 256-prompt mean-diff in 26s
 
 ---
@@ -202,7 +202,7 @@ This is a more interesting claim than the original because it predicts the parti
 
 - bf16 + MPS + transformers 5.7 + manual `register_forward_hook` works cleanly. No quantization needed for 2B model on 48GB.
 - Forward hooks fire correctly during `model.generate()` — confirmed by the ablation experiment producing different generations under the same prompt.
-- All artifacts (directions, probes, results) cached to `experiment1/artifacts/`. Each script is independently rerunnable.
+- All artifacts (directions, probes, results) cached to `src/artifacts/`. Each script is independently rerunnable.
 - Forgery set is small (n=5) and hand-written. For a real predictive claim we'd need ~50+ and an automated success grader.
 
 ---
@@ -210,7 +210,7 @@ This is a more interesting claim than the original because it predicts the parti
 ## Files
 
 ```
-experiment1/
+src/
 ├── model_wrapper.py              # bf16+MPS transformers wrapper, hooks
 ├── compute_refusal_direction.py  # Arditi mean-diff
 ├── train_probe.py                # per-layer LogReg (superseded by cosine_sweep)

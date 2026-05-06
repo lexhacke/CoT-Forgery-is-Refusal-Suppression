@@ -21,12 +21,12 @@ Outputs:
   artifacts/<model>/plots/final_summary.png — final-position bar chart across conditions
 
 Usage:
-  python3 experiment1/run_pilot.py --model-id MODEL
-  python3 experiment1/run_pilot.py --model-id MODEL --layer 13 --tag L13
+  python3 src/run_pilot.py --model-id MODEL
+  python3 src/run_pilot.py --model-id MODEL --layer 13 --tag L13
 
 Requires:
-  python3 experiment1/compute_refusal_direction.py --model-id MODEL
-  python3 experiment1/train_probe.py --model-id MODEL
+  python3 src/compute_refusal_direction.py --model-id MODEL
+  python3 src/train_probe.py --model-id MODEL
 """
 
 from __future__ import annotations

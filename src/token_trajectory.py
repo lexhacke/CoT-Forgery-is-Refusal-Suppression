@@ -19,11 +19,11 @@ Outputs:
     artifacts/<model>/plots/token_{metric}_trajectory_L{layer}.png
 
 Usage:
-    python3 experiment1/token_trajectory.py --model-id MODEL --layer 13 --metric dot
-    python3 experiment1/token_trajectory.py --model-id MODEL --layer 13 --metric cosine
+    python3 src/token_trajectory.py --model-id MODEL --layer 13 --metric dot
+    python3 src/token_trajectory.py --model-id MODEL --layer 13 --metric cosine
 
 Requires:
-    python3 experiment1/compute_refusal_direction.py --model-id MODEL
+    python3 src/compute_refusal_direction.py --model-id MODEL
 """
 
 from __future__ import annotations
