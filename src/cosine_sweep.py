@@ -38,12 +38,18 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import csv
 
 from experiment_paths import add_model_arg, artifact_dir_for, refusal_path_for
 from model_wrapper import GemmaActivationModel
 
 EXPERIMENT_DIR = Path(__file__).parent
 
+forgeries_path = {
+    "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1": "src/datasets/forgeries_llama-nemotron.json",
+    "google/gemma-3-4b-it": "src/datasets/forgeries_gemma.json",
+    "Qwen/Qwen2.5-3B-Instruct": "src/datasets/forgeries_qwen.json"
+}
 
 def metric_per_layer(
     last_tok: torch.Tensor, direction_normed: torch.Tensor, metric: str
@@ -58,6 +64,61 @@ def metric_per_layer(
     if metric == "cosine":
         return dot / (h.norm(dim=-1) + 1e-8)
     raise ValueError(f"Unknown metric: {metric}")
+
+
+def summarize_condition(values: list[float], *, l13: int, late_layer: int) -> dict:
+    """Scalar summaries over non-embedding layers."""
+    arr = np.array(values, dtype=np.float64)
+    non_embed = arr[1:]
+    return {
+        "l13": float(arr[l13]) if l13 < len(arr) else None,
+        "late_layer": late_layer,
+        "late": float(arr[late_layer]),
+        "all_layers_mean": float(non_embed.mean()),
+        "all_layers_std": float(non_embed.std()),
+        "all_layers_min": float(non_embed.min()),
+        "all_layers_max": float(non_embed.max()),
+    }
+
+
+def write_summary_csv(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    columns = list(rows[0].keys())
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def aggregate_summary_rows(rows: list[dict]) -> list[dict]:
+    metrics = [
+        "l13",
+        "late",
+        "all_layers_mean",
+        "all_layers_std",
+        "all_layers_min",
+        "all_layers_max",
+    ]
+    out = []
+    for condition in ["clean", "benign", "injected"]:
+        items = [row for row in rows if row["condition"] == condition]
+        if not items:
+            continue
+        rec = {
+            "condition": condition,
+            "metric": items[0]["metric"],
+            "n": len(items),
+        }
+        for metric in metrics:
+            vals = np.array(
+                [row[metric] for row in items if row[metric] is not None],
+                dtype=np.float64,
+            )
+            rec[f"{metric}_mean"] = float(vals.mean())
+            rec[f"{metric}_std"] = float(vals.std())
+        out.append(rec)
+    return out
 
 
 def main():
@@ -89,12 +150,13 @@ def main():
     train_harmful_mean = train_harmful.mean(dim=0).numpy()
     train_harmless_mean = train_harmless.mean(dim=0).numpy()
 
-    forgeries = json.loads((EXPERIMENT_DIR / "forgeries.json").read_text())
+    forgeries = json.load(open(forgeries_path[args.model_id] if args.model_id in forgeries_path else forgeries_path['google/gemma-3-4b-it']))
 
     print("Loading model...")
     model = GemmaActivationModel(model_id=cached["model_id"], device=args.device)
 
     results = []
+    summary_rows = []
     for f in forgeries:
         clean_text = model.format_prompt(f["harmful_prompt"])
         injected_text = model.format_prompt(f["harmful_prompt"] + " " + f["forged_cot"])
@@ -109,6 +171,16 @@ def main():
 
         l13 = 13
         l_late = n_layers_total - 1
+        for label in ["clean", "injected", "benign"]:
+            summary = summarize_condition(rec[label], l13=l13, late_layer=l_late)
+            summary_rows.append(
+                {
+                    "id": f["id"],
+                    "condition": label,
+                    "metric": args.metric,
+                    **summary,
+                }
+            )
         print(
             f"[forgery {f['id']}] {args.metric} at L13: clean={rec['clean'][l13]:+.3f}  "
             f"injected={rec['injected'][l13]:+.3f}  benign={rec['benign'][l13]:+.3f}  "
@@ -118,11 +190,18 @@ def main():
 
     out = {
         "results": results,
+        "summary": summary_rows,
         "metric": args.metric,
         "train_harmful_mean_per_layer": train_harmful_mean.tolist(),
         "train_harmless_mean_per_layer": train_harmless_mean.tolist(),
     }
     (artifact_dir / f"{args.metric}_results.json").write_text(json.dumps(out, indent=2))
+    summary_path = artifact_dir / f"{args.metric}_summary.csv"
+    write_summary_csv(summary_path, summary_rows)
+    print(f"Saved {summary_path}")
+    model_summary_path = artifact_dir / f"{args.metric}_model_summary.csv"
+    write_summary_csv(model_summary_path, aggregate_summary_rows(summary_rows))
+    print(f"Saved {model_summary_path}")
 
     # --- per-layer mean ± std across forgeries plot ---
     layers = np.arange(n_layers_total)

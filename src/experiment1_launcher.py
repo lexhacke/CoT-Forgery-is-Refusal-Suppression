@@ -49,7 +49,7 @@ def main() -> None:
     ap.add_argument(
         "--salience-metric",
         choices=["direction_norm", "cosine_distance"],
-        default="direction_norm",
+        default="cosine_distance",
     )
     ap.add_argument(
         "--projection-layer",
