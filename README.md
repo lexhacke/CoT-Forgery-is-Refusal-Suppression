@@ -34,10 +34,9 @@ The strongest runs so far show large, bidirectional behavioral flips under resid
 | Model | Intervention | Clean comply | Benign comply | Injected comply | Injected -> clean refusal | Injected -> benign refusal | Clean -> injected comply | Benign -> injected comply |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Qwen2.5-3B-Instruct | all layers | 0% | 10% | 100% | 90% | 100% | 100% | 89% |
-| Gemma-3-1B-it | layer 13 | 0% | 0% | 90% | 100% | 100% | 80% | 70% |
-| Gemma-3-4B-it | layer 13 | 0% | 20% | 80% | 100% | 100% | 90% | 88% |
 | Qwen2.5-1.5B-Instruct | all layers | 0% | 10% | 90% | 100% | 89% | 70% | 67% |
-| Qwen3.5-2B | all layers | 0% | 0% | 50% | 100% | 40% | 80% | 40% |
+| Gemma-3-4B-it | layer 13 | 0% | 20% | 80% | 100% | 100% | 90% | 88% |
+| Gemma-3-1B-it | layer 13 | 0% | 0% | 90% | 100% | 100% | 80% | 70% |
 
 These numbers come from `src/artifacts/judged/judge_metrics.csv`, using an LLM judge over saved rollouts. They should be treated as experiment artifacts rather than final benchmark claims.
 
@@ -75,6 +74,25 @@ training splits used to learn refusal directions:
 ```bash
 git clone https://github.com/andyrdt/refusal_direction.git
 ```
+
+### Forgeries: pick the model family
+
+`calibrated_projection.py` reads forged reasoning traces from `src/forgeries.json`. The forgery style should match the family of the model you are running, since each family has different stylistic signatures of internal reasoning. Two pre-written sets are provided:
+
+- `src/datasets/forgeries_qwen.json` — for Qwen2.5-3B-Instruct and Qwen2.5-1.5B-Instruct.
+- `src/datasets/forgeries_gemma.json` — for Gemma-3-4B-it and Gemma-3-1B-it.
+
+Before running calibrated projection, copy the appropriate file into place:
+
+```bash
+# Running a Qwen model
+cp src/datasets/forgeries_qwen.json src/forgeries.json
+
+# Running a Gemma model
+cp src/datasets/forgeries_gemma.json src/forgeries.json
+```
+
+If you point `calibrated_projection.py` at a Qwen model with the Gemma forgeries (or vice versa), the run will succeed but the injected condition will not reflect the per-family stylistic match described in the paper.
 
 Compute a refusal direction:
 

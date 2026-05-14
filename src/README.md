@@ -30,10 +30,24 @@ python3 src/experiment1_launcher.py \
   --skip-compute \
   --projection-layer auto
 
-# Run a fixed single-layer projection.
+# Run a fixed single-layer projection (Gemma-3 uses layer 13 in the paper).
 python3 src/experiment1_launcher.py \
-  --model-id "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1" \
+  --model-id "google/gemma-3-1b-it" \
   --projection-layer 13
+```
+
+### Forgeries: pick the model family
+
+The calibrated-projection pipeline reads `src/forgeries.json`. Copy the
+matching per-family file before running, since each family has different
+stylistic signatures of internal reasoning:
+
+```bash
+# Qwen2.5-3B-Instruct or Qwen2.5-1.5B-Instruct
+cp src/datasets/forgeries_qwen.json src/forgeries.json
+
+# Gemma-3-4B-it or Gemma-3-1B-it
+cp src/datasets/forgeries_gemma.json src/forgeries.json
 ```
 
 Important args:
