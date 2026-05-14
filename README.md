@@ -158,7 +158,7 @@ Pass `--force-rejudge` to start over.
 ## Notes on Reproducibility
 
 - Per-model artifact paths are registered in `src/experiment_paths.py`.
-- The intervention regimes (all layers for Qwen, layer 13 for Gemma) were selected for empirical patching stability; alternative regimes are reported in Appendix A of the paper.
+- The intervention regimes (all layers for Qwen, layer 13 for Gemma) were selected for empirical patching stability; alternative regimes are reported in Appendix B of the paper.
 - Raw harmful-request rollouts and judged checkpoints are not included in this release. Some completions contain operational harmful content and should be regenerated locally when needed.
 
 ## Safety
