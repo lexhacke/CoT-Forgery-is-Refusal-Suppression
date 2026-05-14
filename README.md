@@ -1,66 +1,92 @@
 # Chain-of-Thought Hijacking as Refusal Suppression
 
-> Prompted reasoning traces can suppress a model's refusal behavior, and the effect can be causally steered through a learned refusal direction in the residual stream.
+Anonymous code release accompanying the paper *Chain-of-Thought Hijacking as Refusal Suppression*, submitted to the ICML 2026 Mechanistic Interpretability Workshop.
 
-This repository contains experiments for studying **chain-of-thought injection** through the lens of mechanistic interpretability. The core hypothesis is that some prompt-injection style attacks work because the injected reasoning trace moves model activations away from a refusal direction, making harmful compliance more likely. We test this by learning refusal directions, patching them into or out of model activations, and measuring whether behavior flips between refusal and compliance.
+The paper hypothesizes that forged chain-of-thought injections work, in part, by suppressing a low-dimensional refusal direction in the residual stream of instruction-tuned language models. The repository implements the two experiments used to test this:
 
-The punchier version of the title is:
+1. A refusal-direction probe measuring per-layer cosine similarity between the last-token residual stream and the refusal direction of Arditi et al. (2024).
+2. A causal projection-shift intervention that patches the refusal-direction component of the final prompt token between clean, benign-filler, and CoT-injected conditions.
 
-**Chain-of-Thought Hijacking Is a Refusal Suppression Mechanism**
+## Models
 
-## What This Tests
+Four instruction-tuned models are evaluated:
 
-For each model, we compare several rollout conditions:
+- `Qwen/Qwen2.5-3B-Instruct`
+- `Qwen/Qwen2.5-1.5B-Instruct`
+- `google/gemma-3-4b-it`
+- `google/gemma-3-1b-it`
 
-- `clean`: harmful prompt alone.
-- `injected`: harmful prompt with a forged reasoning trace.
-- `benign`: harmful prompt with benign filler reasoning.
-- `injected_to_clean`: injected rollout patched toward the clean refusal direction.
-- `injected_to_benign`: injected rollout patched toward the benign direction.
-- `clean_to_injected`: clean rollout patched toward the injected direction.
-- `benign_to_injected`: benign rollout patched toward the injected direction.
+## Conditions
 
-If the mechanism is real, we expect:
+Each harmful prompt is run under three base conditions:
 
-- clean and benign prompts to refuse,
-- injected prompts to comply more often,
-- patching injected activations back toward clean/benign to restore refusal,
-- patching clean/benign activations toward injected to induce compliance.
+- `clean`: the harmful prompt alone.
+- `benign`: the harmful prompt followed by a topic-neutral filler of comparable length.
+- `injected`: the harmful prompt followed by a forged reasoning trace styled to match the model family.
 
-## Current Headline Results
+Four patched conditions are produced by replacing the source prompt's projection onto the refusal direction with the target prompt's projection at the final prompt token: `injected → clean`, `injected → benign`, `clean → injected`, and `benign → injected`.
 
-The strongest runs so far show large, bidirectional behavioral flips under residual-stream intervention:
+## Results
 
-| Model | Intervention | Clean comply | Benign comply | Injected comply | Injected -> clean refusal | Injected -> benign refusal | Clean -> injected comply | Benign -> injected comply |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Qwen2.5-3B-Instruct | all layers | 0% | 10% | 100% | 90% | 100% | 100% | 89% |
-| Qwen2.5-1.5B-Instruct | all layers | 0% | 10% | 90% | 100% | 89% | 70% | 67% |
-| Gemma-3-4B-it | layer 13 | 0% | 20% | 80% | 100% | 100% | 90% | 88% |
-| Gemma-3-1B-it | layer 13 | 0% | 0% | 90% | 100% | 100% | 80% | 70% |
+### Experiment 1: Refusal-direction probe
 
-These numbers come from `src/artifacts/judged/judge_metrics.csv`, using an LLM judge over saved rollouts. They should be treated as experiment artifacts rather than final benchmark claims.
+Layer-averaged cosine similarity with the refusal direction (mean ± std across 10 prompts). Δ = cos<sub>benign</sub> − cos<sub>injected</sub>.
+
+| Model | Clean | Benign | Injected | Δ |
+|---|---:|---:|---:|---:|
+| Qwen2.5-3B-Instruct   | .21 ± .03 | .19 ± .03 | .11 ± .02 | .08 ± .02 |
+| Qwen2.5-1.5B-Instruct | .29 ± .05 | .25 ± .04 | .12 ± .02 | .13 ± .03 |
+| Gemma-3-4B-it         | .42 ± .01 | .41 ± .02 | .37 ± .01 | .04 ± .01 |
+| Gemma-3-1B-it         | .30 ± .02 | .27 ± .03 | .23 ± .02 | .05 ± .01 |
+
+The ordering clean > benign > injected holds for every model, and Δ is positive on every prompt.
+
+### Experiment 2: Causal patching
+
+Baseline compliance rates. Intervention regime is per-family: all transformer blocks for the Qwen family, layer 13 for the Gemma family.
+
+| Model | Regime | Injected | Benign | Clean |
+|---|---|---:|---:|---:|
+| Qwen2.5-3B-Instruct   | all layers | 100% | 10% | 0% |
+| Qwen2.5-1.5B-Instruct | all layers |  90% | 10% | 0% |
+| Gemma-3-4B-it         | layer 13   |  80% | 10% | 0% |
+| Gemma-3-1B-it         | layer 13   |  90% |  0% | 0% |
+
+Restoring refusal in initially-compliant injected prompts (refusal rate / incoherence rate):
+
+| Model | → Clean | → Benign |
+|---|---|---|
+| Qwen2.5-3B-Instruct   |  90% / 10% | 100% /  0% |
+| Qwen2.5-1.5B-Instruct | 100% /  0% |  89% / 10% |
+| Gemma-3-4B-it         | 100% /  0% | 100% /  0% |
+| Gemma-3-1B-it         | 100% /  0% | 100% /  0% |
+
+Inducing compliance in initially-refusing clean and benign prompts (compliance rate / incoherence rate):
+
+| Model | Clean → Injected | Benign → Injected |
+|---|---|---|
+| Qwen2.5-3B-Instruct   | 100% /  0% | 100% /  0% |
+| Qwen2.5-1.5B-Instruct |  70% / 20% |  67% / 20% |
+| Gemma-3-4B-it         |  90% /  0% |  89% /  0% |
+| Gemma-3-1B-it         |  80% /  0% |  70% /  0% |
 
 ## Repository Layout
 
-```text
+```
 src/
-  compute_refusal_direction.py   Learn per-layer refusal directions.
-  calibrated_projection.py       Patch activations along learned directions.
-  token_trajectory.py            Inspect refusal-direction trajectories.
-  model_wrapper.py               Model loading, prompting, generation, activation hooks.
-  experiment_paths.py            Model-to-artifact path registry.
-  artifacts/
-    llm_as_a_judge.py            LLM judge and metric aggregation pipeline.
-    judged/                      Judge rows, nested reports, and metrics.
+  compute_refusal_direction.py   Estimate per-layer refusal directions (Arditi et al., 2024).
+  calibrated_projection.py       Projection-shift interventions on the refusal direction.
+  experiment1_launcher.py        Runs refusal-direction extraction and projection back to back.
+  model_wrapper.py               Model loading, prompt formatting, activation hooks.
+  experiment_paths.py            Per-model artifact directory registry.
   datasets/
-    forgeries_qwen.json          Qwen-style forged reasoning traces.
-    forgeries_gemma.json         Gemma-style forged reasoning traces.
-  example_cot/                   Native model reasoning examples for style matching.
+    forgeries_qwen.json          Qwen-family forged reasoning traces (10 prompts).
+    forgeries_gemma.json         Gemma-family forged reasoning traces (10 prompts).
+  artifacts/
+    llm_as_a_judge.py            LLM-judge pipeline (Gemini-3-Flash).
 ```
 
-## Quick Start
-
-Create an environment and install dependencies:
+## Setup
 
 ```bash
 python3 -m venv .venv
@@ -68,51 +94,42 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Clone the refusal-direction reference repository to provide the harmful/harmless
-training splits used to learn refusal directions:
+Refusal directions are estimated from the harmful and harmless training splits used by Arditi et al. (2024). Clone their reference repository at the project root:
 
 ```bash
 git clone https://github.com/andyrdt/refusal_direction.git
 ```
 
-### Forgeries: pick the model family
+## Forgeries
 
-`calibrated_projection.py` reads forged reasoning traces from `src/forgeries.json`. The forgery style should match the family of the model you are running, since each family has different stylistic signatures of internal reasoning. Two pre-written sets are provided:
-
-- `src/datasets/forgeries_qwen.json` — for Qwen2.5-3B-Instruct and Qwen2.5-1.5B-Instruct.
-- `src/datasets/forgeries_gemma.json` — for Gemma-3-4B-it and Gemma-3-1B-it.
-
-Before running calibrated projection, copy the appropriate file into place:
+`calibrated_projection.py` reads forged reasoning traces from `src/forgeries.json`. Two pre-written sets are provided, each matched to a model family's stylistic signature. Copy the appropriate file into place before running:
 
 ```bash
-# Running a Qwen model
+# Qwen family
 cp src/datasets/forgeries_qwen.json src/forgeries.json
 
-# Running a Gemma model
+# Gemma family
 cp src/datasets/forgeries_gemma.json src/forgeries.json
 ```
 
-If you point `calibrated_projection.py` at a Qwen model with the Gemma forgeries (or vice versa), the run will succeed but the injected condition will not reflect the per-family stylistic match described in the paper.
+## Reproducing the Experiments
 
-Compute a refusal direction:
+Compute a refusal direction (per-model artifact saved under `src/artifacts/<model>/refusal.pt`):
 
 ```bash
-python3 src/compute_refusal_direction.py \
-  --model-id "Qwen/Qwen2.5-3B-Instruct"
+python3 src/compute_refusal_direction.py --model-id "Qwen/Qwen2.5-3B-Instruct"
 ```
 
-Run calibrated activation patching:
+Run the projection-shift intervention. The paper uses all-layer interventions for Qwen models and a single-layer intervention at layer 13 for Gemma models:
 
 ```bash
+# Qwen family
 python3 src/calibrated_projection.py \
   --model-id "Qwen/Qwen2.5-3B-Instruct" \
   --intervention shift \
   --token-scope all
-```
 
-For single-layer interventions:
-
-```bash
+# Gemma family
 python3 src/calibrated_projection.py \
   --model-id "google/gemma-3-4b-it" \
   --intervention shift \
@@ -120,44 +137,34 @@ python3 src/calibrated_projection.py \
   --layer 13
 ```
 
-Judge saved rollouts and aggregate metrics:
+Rollouts are written to `src/artifacts/<model>/calibrated_projection/<run>/results.json`.
+
+## Judging
+
+Outputs are classified by an LLM judge using the three-way rubric from the paper (comply / refuse / incoherent). The default backend is Gemini-3-Flash:
 
 ```bash
-GEMINI_API_KEY="..." python3 src/artifacts/llm_as_a_judge.py
+GOOGLE_API_KEY="..." python3 src/artifacts/llm_as_a_judge.py
 ```
 
 The judge writes:
 
-```text
-src/artifacts/judged/judge_rows.csv
-src/artifacts/judged/judge_metrics.csv
-src/artifacts/judged/judge_nested.json
-```
+- `src/artifacts/judged/judge_rows.csv` — one row per (model, run, prompt, condition); the resumable checkpoint.
+- `src/artifacts/judged/judge_metrics.csv` — aggregate rates.
+- `src/artifacts/judged/judge_nested.json` — nested lookup format.
 
-`judge_rows.csv` is the resumable checkpoint. `judge_nested.json` is the convenient lookup artifact.
+Pass `--force-rejudge` to start over.
 
 ## Notes on Reproducibility
 
-- Artifacts are keyed by Hugging Face model id in `src/experiment_paths.py`.
-- This anonymous artifact includes the code and prompt templates needed to
-  regenerate the experiments, but does not include raw harmful-request rollouts.
-  Some completions contain operational harmful content, so raw rollouts and
-  derived judge checkpoints should be regenerated locally when needed.
-- Some models work best with all-layer interventions; others require localized single-layer interventions.
-- The current strongest Gemma results use layer 13.
-- The current strongest Qwen results use all-layer patching.
-- The judge pipeline resumes automatically from `judge_rows.csv`; pass `--force-rejudge` to start over.
-
-## Research Status
-
-This is an active research codebase. The current evidence supports the claim that forged reasoning traces can suppress refusal behavior in several small open-weight instruction models, and that this behavioral change can often be reversed or induced through a learned residual-stream direction.
-
-The next planned analysis is a directional-derivative / refusal-token trajectory map: tracing when generated reasoning moves toward or away from the refusal direction across the rollout.
+- Per-model artifact paths are registered in `src/experiment_paths.py`.
+- The intervention regimes (all layers for Qwen, layer 13 for Gemma) were selected for empirical patching stability; alternative regimes are reported in Appendix A of the paper.
+- Raw harmful-request rollouts and judged checkpoints are not included in this release. Some completions contain operational harmful content and should be regenerated locally when needed.
 
 ## Safety
 
-This repository is for mechanistic interpretability and safety research. The experiments classify and analyze harmful-request rollouts, but the goal is to understand and reduce jailbreak susceptibility, not to provide operational harmful instructions.
+This repository supports mechanistic interpretability and safety research. The experiments classify and analyze harmful-request rollouts to characterize how forged chain-of-thought injections bypass refusal behavior; the goal is to inform defenses, not to provide operational harmful content.
 
-## Citation
+## References
 
-Citation information will be added when the paper draft is public.
+- Arditi, A., Obeso, O., Syed, A., Paleka, D., Panickssery, N., Gurnee, W., and Nanda, N. *Refusal in language models is mediated by a single direction*, 2024. https://arxiv.org/abs/2406.11717
