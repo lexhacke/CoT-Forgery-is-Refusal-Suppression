@@ -4,10 +4,19 @@ This folder contains the refusal-direction and calibrated-projection pipeline, p
 
 ## Run An Experiment
 
-Use `src_launcher.py` to run refusal-direction extraction and calibrated projection back to back:
+Clone the refusal-direction reference repository at the repo root before running
+refusal-direction extraction. This provides the harmful/harmless training
+splits expected by `compute_refusal_direction.py`:
 
 ```bash
-python3 src/src_launcher.py \
+git clone https://github.com/andyrdt/refusal_direction.git
+```
+
+Use `experiment1_launcher.py` to run refusal-direction extraction and calibrated
+projection back to back:
+
+```bash
+python3 src/experiment1_launcher.py \
   --model-id "Qwen/Qwen2.5-3B-Instruct" \
   --projection-layer all
 ```
@@ -16,13 +25,13 @@ Common examples:
 
 ```bash
 # Reuse an existing refusal.pt and edit the auto-selected salient layer.
-python3 src/src_launcher.py \
+python3 src/experiment1_launcher.py \
   --model-id "google/gemma-3-4b-it" \
   --skip-compute \
   --projection-layer auto
 
 # Run a fixed single-layer projection.
-python3 src/src_launcher.py \
+python3 src/experiment1_launcher.py \
   --model-id "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1" \
   --projection-layer 13
 ```
@@ -68,6 +77,10 @@ It writes:
 - `src/artifacts/judged/judge_rows.csv`: streaming checkpoint, one row per model/run/prompt/condition.
 - `src/artifacts/judged/judge_metrics.csv`: aggregate rates.
 - `src/artifacts/judged/judge_nested.json`: nested report format.
+
+The anonymous artifact does not include raw harmful-request rollouts or judged
+checkpoint files. Some completions contain operational harmful content; rerun
+the generation and judging scripts locally when raw outputs are needed.
 
 Common examples:
 

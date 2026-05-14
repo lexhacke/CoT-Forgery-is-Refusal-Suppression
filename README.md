@@ -69,6 +69,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Clone the refusal-direction reference repository to provide the harmful/harmless
+training splits used to learn refusal directions:
+
+```bash
+git clone https://github.com/andyrdt/refusal_direction.git
+```
+
 Compute a refusal direction:
 
 ```bash
@@ -114,6 +121,10 @@ src/artifacts/judged/judge_nested.json
 ## Notes on Reproducibility
 
 - Artifacts are keyed by Hugging Face model id in `src/experiment_paths.py`.
+- This anonymous artifact includes the code and prompt templates needed to
+  regenerate the experiments, but does not include raw harmful-request rollouts.
+  Some completions contain operational harmful content, so raw rollouts and
+  derived judge checkpoints should be regenerated locally when needed.
 - Some models work best with all-layer interventions; others require localized single-layer interventions.
 - The current strongest Gemma results use layer 13.
 - The current strongest Qwen results use all-layer patching.
